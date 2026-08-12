@@ -114,3 +114,33 @@ export const updateCustomer = async (req: AuthenticatedRequest, res: Response, n
     next(error);
   }
 };
+export const deleteCustomer = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+  const { id } = req.params as { id: string };
+  try {
+    const customer = await prisma.customer.findUnique({
+      where: { id },
+    });
+    
+    if (!customer) {
+      res.status(404).json({ status: 'fail', message: 'Customer not found' });
+      return;
+    }
+
+    const challanCount = await prisma.challan.count({
+      where: { customerId: id },
+    });
+
+    if (challanCount > 0) {
+      res.status(400).json({
+        status: 'fail',
+        message: 'Cannot delete customer. They have active sales challans linked to their profile.',
+      });
+      return;
+    }
+
+    await prisma.customer.delete({ where: { id } });
+    res.status(200).json({ status: 'success', message: 'Customer deleted successfully' });
+  } catch (error) {
+    next(error);
+  }
+};

@@ -31,27 +31,137 @@ const Products: React.FC = () => {
   const { user } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [lowStockFilter, setLowStockFilter] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Search debouncing hook
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   // Modals state
   const [showFormModal, setShowFormModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
-  // Form state
+  // Form state (using string or number to prevent stuck zero state)
   const [formName, setFormName] = useState('');
   const [formSku, setFormSku] = useState('');
   const [formCategory, setFormCategory] = useState('');
-  const [formPrice, setFormPrice] = useState(0);
-  const [formStock, setFormStock] = useState(0);
-  const [formMinAlert, setFormMinAlert] = useState(0);
+  const [formPrice, setFormPrice] = useState<number | ''>('');
+  const [formStock, setFormStock] = useState<number | ''>('');
+  const [formMinAlert, setFormMinAlert] = useState<number | ''>('');
   const [formLocation, setFormLocation] = useState('');
-  const [formReason, setFormReason] = useState(''); // Only for editing stock adjustments
+  const [formReason, setFormReason] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
 
+  // Extra filter states
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
+
+  // Sorting state
+  const [sortField, setSortField] = useState<string | null>(null);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+
+  // Row selection state
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  // Custom dialog modal state
+  const [dialog, setDialog] = useState<{
+    isOpen: boolean;
+    type: 'alert' | 'confirm';
+    title: string;
+    message: string;
+    onConfirm?: () => void;
+  }>({
+    isOpen: false,
+    type: 'alert',
+    title: '',
+    message: '',
+  });
+
+  const showCustomAlert = (title: string, message: string) => {
+    setDialog({ isOpen: true, type: 'alert', title, message });
+  };
+
+  const showCustomConfirm = (title: string, message: string, onConfirm: () => void) => {
+    setDialog({ isOpen: true, type: 'confirm', title, message, onConfirm });
+  };
+
   const canWrite = user?.role === 'ADMIN' || user?.role === 'WAREHOUSE';
+
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortOrder('asc');
+    }
+  };
+
+  const renderSortHeader = (field: string, label: string) => {
+    const isSorted = sortField === field;
+    return (
+      <th onClick={() => handleSort(field)} style={{ cursor: 'pointer', userSelect: 'none' }}>
+        <div className="th-content">
+          {label}
+          <span className="sort-arrows" style={{ color: isSorted ? 'var(--gray-900)' : 'var(--gray-300)', marginLeft: '0.25rem' }}>
+            {isSorted ? (sortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
+          </span>
+        </div>
+      </th>
+    );
+  };
+
+  const uniqueCategories = React.useMemo(() => {
+    return Array.from(new Set(products.map((p) => p.category))).filter(Boolean);
+  }, [products]);
+
+  const filteredProducts = React.useMemo(() => {
+    let result = [...products];
+
+    // Price range filters
+    if (minPrice !== '') {
+      result = result.filter((p) => p.unitPrice >= Number(minPrice));
+    }
+    if (maxPrice !== '') {
+      result = result.filter((p) => p.unitPrice <= Number(maxPrice));
+    }
+
+    // Category filter
+    if (categoryFilter) {
+      result = result.filter((p) => p.category.toLowerCase() === categoryFilter.toLowerCase());
+    }
+
+    // Client-side sorting
+    if (sortField) {
+      result.sort((a: any, b: any) => {
+        let valA = a[sortField];
+        let valB = b[sortField];
+
+        // Special handling for computed stock status
+        if (sortField === 'stockStatus') {
+          valA = a.currentStock <= a.minStockAlert ? 1 : 0;
+          valB = b.currentStock <= b.minStockAlert ? 1 : 0;
+        }
+
+        if (typeof valA === 'string') valA = valA.toLowerCase();
+        if (typeof valB === 'string') valB = valB.toLowerCase();
+
+        if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+        if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return result;
+  }, [products, minPrice, maxPrice, categoryFilter, sortField, sortOrder]);
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -59,7 +169,7 @@ const Products: React.FC = () => {
     try {
       let query = '';
       const params: string[] = [];
-      if (search) params.push(`search=${encodeURIComponent(search)}`);
+      if (debouncedSearch) params.push(`search=${encodeURIComponent(debouncedSearch)}`);
       if (lowStockFilter) params.push('lowStock=true');
       
       if (params.length > 0) {
@@ -77,29 +187,26 @@ const Products: React.FC = () => {
 
   useEffect(() => {
     fetchProducts();
-  }, [lowStockFilter]);
+  }, [lowStockFilter, debouncedSearch]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    fetchProducts();
   };
 
-  // Open modal to add product
   const handleAddClick = () => {
     setSelectedProduct(null);
     setFormName('');
     setFormSku('');
     setFormCategory('');
-    setFormPrice(0);
-    setFormStock(0);
-    setFormMinAlert(0);
+    setFormPrice('');
+    setFormStock('');
+    setFormMinAlert('');
     setFormLocation('');
     setFormReason('');
     setFormError(null);
     setShowFormModal(true);
   };
 
-  // Open modal to edit product / adjust stock
   const handleEditClick = (product: Product, e: React.MouseEvent) => {
     e.stopPropagation();
     setSelectedProduct(product);
@@ -115,24 +222,61 @@ const Products: React.FC = () => {
     setShowFormModal(true);
   };
 
-  // Open product details to view movement logs
+  const handleDeleteSingle = async () => {
+    if (!selectedProduct) return;
+    showCustomConfirm(
+      'Delete Product',
+      `Are you sure you want to delete product "${selectedProduct.name}"?`,
+      async () => {
+        try {
+          await api.delete(`/products/${selectedProduct.id}`);
+          setShowFormModal(false);
+          fetchProducts();
+          showCustomAlert('Deleted Successfully', 'Product has been permanently removed.');
+        } catch (err: any) {
+          showCustomAlert('Deletion Failed', err.message || 'Failed to delete product.');
+        }
+      }
+    );
+  };
+
+  const handleBulkDelete = async () => {
+    showCustomConfirm(
+      'Bulk Delete',
+      `Are you sure you want to delete the ${selectedIds.length} selected products?`,
+      async () => {
+        try {
+          await Promise.all(selectedIds.map(id => api.delete(`/products/${id}`)));
+          setSelectedIds([]);
+          fetchProducts();
+          showCustomAlert('Deleted Successfully', 'Selected products have been permanently removed.');
+        } catch (err: any) {
+          showCustomAlert('Bulk Deletion Failed', err.message || 'An error occurred during bulk deletion.');
+          fetchProducts();
+        }
+      }
+    );
+  };
+
   const handleRowClick = async (product: Product) => {
     try {
       const response = await api.get(`/products/${product.id}`);
       setSelectedProduct(response.data);
       setShowDetailModal(true);
     } catch (err: any) {
-      alert(err.message || 'Failed to fetch product movement history.');
+      showCustomAlert('Fetch Failed', err.message || 'Failed to fetch product movement history.');
     }
   };
 
-  // Submit Product form (Add/Edit)
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
 
-    // Basic numerical validations
-    if (formPrice < 0 || formStock < 0 || formMinAlert < 0) {
+    const priceNum = Number(formPrice);
+    const stockNum = Number(formStock);
+    const alertNum = Number(formMinAlert);
+
+    if (priceNum < 0 || stockNum < 0 || alertNum < 0) {
       setFormError('Numbers cannot be negative.');
       return;
     }
@@ -141,13 +285,12 @@ const Products: React.FC = () => {
       name: formName,
       sku: formSku,
       category: formCategory,
-      unitPrice: Number(formPrice),
-      currentStock: Number(formStock),
-      minStockAlert: Number(formMinAlert),
+      unitPrice: priceNum,
+      currentStock: stockNum,
+      minStockAlert: alertNum,
       location: formLocation,
     };
 
-    // If editing and the stock has changed, require a reason for audit logs
     if (selectedProduct && Number(formStock) !== selectedProduct.currentStock) {
       if (!formReason.trim()) {
         setFormError('You must specify a reason for this inventory adjustment.');
@@ -169,123 +312,245 @@ const Products: React.FC = () => {
     }
   };
 
+  // Helper gradient styling for product items
+  const getProductGradient = (sku: string) => {
+    const code = sku.charCodeAt(sku.length - 1) % 4;
+    switch (code) {
+      case 0: return 'linear-gradient(135deg, #a78bfa, #c084fc)';
+      case 1: return 'linear-gradient(135deg, #60a5fa, #93c5fd)';
+      case 2: return 'linear-gradient(135deg, #34d399, #10b981)';
+      default: return 'linear-gradient(135deg, #fb7185, #fda4af)';
+    }
+  };
+
   return (
     <div>
-      <div className="panel-header">
-        <h2 style={{ fontWeight: 600, fontSize: '1.5rem' }}>Product Catalog & Inventory</h2>
-        {canWrite && (
-          <button className="btn btn-primary" onClick={handleAddClick} style={{ width: 'auto', gap: '0.5rem' }}>
-            <Plus size={16} /> Add Product
-          </button>
-        )}
-      </div>
-
-      <div className="card">
-        {/* Search & Low Stock Filters */}
-        <form onSubmit={handleSearchSubmit} className="search-filter-bar">
+      {/* Top Controls Bar */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+        <form onSubmit={handleSearchSubmit} className="search-filter-bar" style={{ marginBottom: 0 }}>
           <div className="search-input-wrapper">
-            <Search size={18} className="search-icon" />
+            <Search size={14} className="search-icon" />
             <input
               type="text"
-              placeholder="Search by product name or SKU..."
+              placeholder="Search products..."
               className="search-input"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
 
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 500 }}>
+          <select
+            className="select-filter"
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+          >
+            <option value="">All Categories</option>
+            {uniqueCategories.map((cat) => (
+              <option key={cat} value={cat}>{cat}</option>
+            ))}
+          </select>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+            <input
+              type="number"
+              placeholder="Min ₹"
+              className="form-input"
+              style={{ width: '80px', padding: '0.45rem 0.5rem', fontSize: '0.8rem', height: '36px' }}
+              value={minPrice}
+              onChange={(e) => setMinPrice(e.target.value)}
+            />
+            <span style={{ fontSize: '0.75rem', color: 'var(--gray-400)' }}>to</span>
+            <input
+              type="number"
+              placeholder="Max ₹"
+              className="form-input"
+              style={{ width: '80px', padding: '0.45rem 0.5rem', fontSize: '0.8rem', height: '36px' }}
+              value={maxPrice}
+              onChange={(e) => setMaxPrice(e.target.value)}
+            />
+          </div>
+
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', cursor: 'pointer', fontSize: '0.825rem', fontWeight: 500 }}>
             <input
               type="checkbox"
               checked={lowStockFilter}
               onChange={(e) => setLowStockFilter(e.target.checked)}
-              style={{ width: '16px', height: '16px' }}
+              style={{ width: '15px', height: '15px', cursor: 'pointer' }}
             />
-            <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: lowStockFilter ? 'var(--color-danger-text)' : 'inherit' }}>
-              <AlertTriangle size={16} /> Low Stock Warnings
+            <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: lowStockFilter ? 'var(--status-idle-text)' : 'inherit' }}>
+              <AlertTriangle size={14} /> Low Stock Warnings
             </span>
           </label>
-
-          <button type="submit" className="btn btn-secondary" style={{ width: 'auto' }}>
-            Filter
-          </button>
         </form>
 
-        {error && <div className="error-banner">{error}</div>}
+        {canWrite && (
+          <button className="btn btn-primary" onClick={handleAddClick} style={{ width: 'auto', gap: '0.375rem', padding: '0.5rem 1rem' }}>
+            <Plus size={14} /> Add Product
+          </button>
+        )}
+      </div>
 
-        {/* Product Grid Table */}
-        <div className="table-container">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Product Details</th>
-                <th>SKU</th>
-                <th>Category</th>
-                <th>Unit Price</th>
-                <th>Current Stock</th>
-                <th>Alert Threshold</th>
-                <th>Warehouse Bin</th>
-                <th>Stock Status</th>
-                {canWrite && <th style={{ textAlign: 'right' }}>Actions</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={9} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
-                    Loading products...
-                  </td>
-                </tr>
-              ) : products.length === 0 ? (
-                <tr>
-                  <td colSpan={9} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
-                    No products found.
-                  </td>
-                </tr>
-              ) : (
-                products.map((prod) => {
-                  const isLowStock = prod.currentStock <= prod.minStockAlert;
-                  return (
-                    <tr key={prod.id} onClick={() => handleRowClick(prod)} style={{ cursor: 'pointer' }}>
-                      <td style={{ fontWeight: 500 }}>{prod.name}</td>
-                      <td style={{ fontFamily: 'monospace' }}>{prod.sku}</td>
-                      <td>{prod.category}</td>
-                      <td>₹{prod.unitPrice.toLocaleString('en-IN')}</td>
-                      <td style={{ fontWeight: 600 }}>{prod.currentStock} units</td>
-                      <td>{prod.minStockAlert} units</td>
-                      <td>{prod.location}</td>
-                      <td>
-                        {isLowStock ? (
-                          <span className="badge badge-danger" style={{ gap: '0.25rem' }}>
-                            <AlertTriangle size={12} /> Low Stock
-                          </span>
-                        ) : (
-                          <span className="badge badge-success">Sufficient</span>
-                        )}
-                      </td>
-                      {canWrite && (
-                        <td style={{ textAlign: 'right' }}>
-                          <button
-                            className="btn-secondary"
-                            onClick={(e) => handleEditClick(prod, e)}
-                            style={{
-                              padding: '0.25rem 0.5rem',
-                              fontSize: '0.75rem',
-                              borderRadius: '4px',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            Adjust Stock
-                          </button>
-                        </td>
-                      )}
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+      {error && <div className="error-banner">{error}</div>}
+
+      {/* Bulk Delete Selection Bar */}
+      {selectedIds.length > 0 && (
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          backgroundColor: '#fef2f2',
+          border: '1px solid #fca5a5',
+          padding: '0.625rem 1rem',
+          borderRadius: 'var(--radius-md)',
+          marginBottom: '1rem'
+        }}>
+          <span style={{ fontSize: '0.825rem', color: '#b91c1c', fontWeight: 600 }}>
+            {selectedIds.length} product{selectedIds.length > 1 ? 's' : ''} selected
+          </span>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              style={{ width: 'auto', padding: '0.35rem 0.75rem', fontSize: '0.75rem', height: '30px', display: 'flex', alignItems: 'center' }}
+              onClick={() => setSelectedIds([])}
+            >
+              Unselect All
+            </button>
+            {canWrite && (
+              <button
+                type="button"
+                className="btn"
+                style={{
+                  width: 'auto',
+                  padding: '0.35rem 0.75rem',
+                  fontSize: '0.75rem',
+                  backgroundColor: '#dc2626',
+                  color: 'white',
+                  borderColor: '#dc2626',
+                  height: '30px',
+                  display: 'flex',
+                  alignItems: 'center'
+                }}
+                onClick={handleBulkDelete}
+              >
+                Delete Selected
+              </button>
+            )}
+          </div>
         </div>
+      )}
+
+      {/* Product Catalog Grid */}
+      <div className="table-container">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th style={{ width: '40px' }}>
+                <input 
+                  type="checkbox" 
+                  className="checkbox-custom" 
+                  checked={filteredProducts.length > 0 && filteredProducts.every(p => selectedIds.includes(p.id))}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      const pageIds = filteredProducts.map(p => p.id);
+                      setSelectedIds(prev => Array.from(new Set([...prev, ...pageIds])));
+                    } else {
+                      const pageIds = filteredProducts.map(p => p.id);
+                      setSelectedIds(prev => prev.filter(id => !pageIds.includes(id)));
+                    }
+                  }}
+                />
+              </th>
+              {renderSortHeader('name', 'Product Details')}
+              {renderSortHeader('sku', 'SKU')}
+              {renderSortHeader('category', 'Category')}
+              {renderSortHeader('unitPrice', 'Unit Price')}
+              {renderSortHeader('currentStock', 'Current Stock')}
+              <th>Alert Threshold</th>
+              {renderSortHeader('location', 'Location')}
+              {renderSortHeader('stockStatus', 'Stock Status')}
+              {canWrite && <th style={{ textAlign: 'right', width: '120px' }}>Actions</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr>
+                <td colSpan={10} style={{ textAlign: 'center', padding: '2rem', color: 'var(--gray-400)' }}>
+                  Loading warehouse catalog...
+                </td>
+              </tr>
+            ) : filteredProducts.length === 0 ? (
+              <tr>
+                <td colSpan={10} style={{ textAlign: 'center', padding: '2rem', color: 'var(--gray-400)' }}>
+                  No catalog items found.
+                </td>
+              </tr>
+            ) : (
+              filteredProducts.map((prod) => {
+                const isLowStock = prod.currentStock <= prod.minStockAlert;
+                const grad = getProductGradient(prod.sku);
+                return (
+                  <tr key={prod.id} onClick={() => handleRowClick(prod)}>
+                    <td onClick={(e) => e.stopPropagation()}>
+                      <input 
+                        type="checkbox" 
+                        className="checkbox-custom" 
+                        checked={selectedIds.includes(prod.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedIds(prev => [...prev, prod.id]);
+                          } else {
+                            setSelectedIds(prev => prev.filter(id => id !== prod.id));
+                          }
+                        }}
+                      />
+                    </td>
+                    <td>
+                      <div className="company-cell">
+                        <div className="company-gradient" style={{ background: grad }}></div>
+                        <span style={{ fontWeight: 600, color: 'var(--gray-900)' }}>{prod.name}</span>
+                      </div>
+                    </td>
+                    <td style={{ fontFamily: 'monospace', fontWeight: 500 }}>{prod.sku}</td>
+                    <td>{prod.category}</td>
+                    <td>₹{prod.unitPrice.toLocaleString('en-IN')}</td>
+                    <td style={{ fontWeight: 600 }}>{prod.currentStock} units</td>
+                    <td>{prod.minStockAlert} units</td>
+                    <td>
+                      <span className="badge badge-info" style={{ borderRadius: '6px' }}>
+                        {prod.location}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="status-dot-cell">
+                        <span className={`status-dot ${isLowStock ? 'status-dot-cancelled' : 'status-dot-active'}`}></span>
+                        <span style={{
+                          color: isLowStock ? 'var(--status-cancelled-text)' : 'var(--status-active-text)'
+                        }}>
+                          {isLowStock ? 'Low Stock' : 'Sufficient'}
+                        </span>
+                      </div>
+                    </td>
+                    {canWrite && (
+                      <td style={{ textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
+                        <div className="row-actions-wrapper">
+                          <button
+                            className="pagination-btn-nav"
+                            onClick={(e) => handleEditClick(prod, e)}
+                            style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}
+                          >
+                            Adjust
+                          </button>
+                          <span style={{ color: 'var(--gray-300)', fontSize: '0.875rem' }}>›</span>
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
       </div>
 
       {/* ==========================================
@@ -344,7 +609,7 @@ const Products: React.FC = () => {
                     required
                     className="form-input"
                     value={formPrice}
-                    onChange={(e) => setFormPrice(Number(e.target.value))}
+                    onChange={(e) => setFormPrice(e.target.value === '' ? '' : Number(e.target.value))}
                   />
                 </div>
               </div>
@@ -357,7 +622,7 @@ const Products: React.FC = () => {
                     required
                     className="form-input"
                     value={formStock}
-                    onChange={(e) => setFormStock(Number(e.target.value))}
+                    onChange={(e) => setFormStock(e.target.value === '' ? '' : Number(e.target.value))}
                   />
                 </div>
                 <div className="form-group">
@@ -367,7 +632,7 @@ const Products: React.FC = () => {
                     required
                     className="form-input"
                     value={formMinAlert}
-                    onChange={(e) => setFormMinAlert(Number(e.target.value))}
+                    onChange={(e) => setFormMinAlert(e.target.value === '' ? '' : Number(e.target.value))}
                   />
                 </div>
               </div>
@@ -384,24 +649,39 @@ const Products: React.FC = () => {
                 />
               </div>
 
-              {/* Display Reason box ONLY when editing product AND stock count is modified */}
               {selectedProduct && Number(formStock) !== selectedProduct.currentStock && (
-                <div className="form-group" style={{ backgroundColor: 'var(--color-warning-bg)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--color-warning-text)' }}>
-                  <label className="form-label" style={{ color: 'var(--color-warning-text)', fontWeight: 600 }}>
+                <div className="form-group" style={{ backgroundColor: 'var(--gray-50)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--gray-200)' }}>
+                  <label className="form-label" style={{ color: 'var(--status-idle-text)', fontWeight: 600 }}>
                     Reason for Stock Adjustment (Audit Requirement)
                   </label>
                   <input
                     type="text"
                     required
                     className="form-input"
-                    placeholder="e.g., Stock count discrepancy corrected, Damages removed, Inbound shipment"
+                    placeholder="e.g., Damaged item write-off, Cycle count adjustment"
                     value={formReason}
                     onChange={(e) => setFormReason(e.target.value)}
                   />
                 </div>
               )}
 
-              <div className="modal-footer">
+              <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', width: '100%' }}>
+                {selectedProduct && canWrite && (
+                  <button
+                    type="button"
+                    className="btn"
+                    style={{
+                      width: 'auto',
+                      backgroundColor: '#dc2626',
+                      color: 'white',
+                      borderColor: '#dc2626',
+                      marginRight: 'auto'
+                    }}
+                    onClick={handleDeleteSingle}
+                  >
+                    Delete Product
+                  </button>
+                )}
                 <button type="button" className="btn btn-secondary" style={{ width: 'auto' }} onClick={() => setShowFormModal(false)}>
                   Cancel
                 </button>
@@ -419,54 +699,53 @@ const Products: React.FC = () => {
          ========================================== */}
       {showDetailModal && selectedProduct && (
         <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '750px' }}>
+          <div className="modal-content" style={{ maxWidth: '720px' }}>
             <div className="modal-header">
               <h3 className="modal-title">Inventory Card: {selectedProduct.name}</h3>
               <button className="modal-close" onClick={() => setShowDetailModal(false)}>×</button>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem', padding: '1rem', backgroundColor: 'var(--bg-app)', borderRadius: '8px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1.25rem', padding: '0.875rem', backgroundColor: 'var(--gray-50)', borderRadius: '8px', border: '1px solid var(--gray-200)' }}>
               <div>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>SKU Code</span>
-                <p style={{ fontWeight: 600, fontFamily: 'monospace' }}>{selectedProduct.sku}</p>
+                <span style={{ fontSize: '0.7rem', color: 'var(--gray-500)', textTransform: 'uppercase', fontWeight: 600 }}>SKU Code</span>
+                <p style={{ fontWeight: 600, fontFamily: 'monospace', fontSize: '0.875rem', marginTop: '0.125rem' }}>{selectedProduct.sku}</p>
               </div>
               <div>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Current Stock</span>
-                <p style={{ fontWeight: 600 }}>{selectedProduct.currentStock} units</p>
+                <span style={{ fontSize: '0.7rem', color: 'var(--gray-500)', textTransform: 'uppercase', fontWeight: 600 }}>Current Stock</span>
+                <p style={{ fontWeight: 600, fontSize: '0.875rem', marginTop: '0.125rem' }}>{selectedProduct.currentStock} units</p>
               </div>
               <div>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Bin Location</span>
-                <p style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                <span style={{ fontSize: '0.7rem', color: 'var(--gray-500)', textTransform: 'uppercase', fontWeight: 600 }}>Bin Location</span>
+                <p style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.875rem', marginTop: '0.125rem' }}>
                   <Warehouse size={14} /> {selectedProduct.location}
                 </p>
               </div>
             </div>
 
-            <h4 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, marginBottom: '1rem', fontSize: '1rem' }}>
-              <ClipboardList size={18} /> Stock Movement Audit Logs
+            <h4 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, marginBottom: '0.75rem', fontSize: '0.95rem' }}>
+              <ClipboardList size={16} /> Stock Movement Audit Logs
             </h4>
 
-            {/* Audit Logs List */}
             {!selectedProduct.stockMovements || selectedProduct.stockMovements.length === 0 ? (
-              <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-                No stock movement recorded yet for this product.
+              <p style={{ fontSize: '0.8rem', color: 'var(--gray-500)', fontStyle: 'italic' }}>
+                No stock movement recorded yet.
               </p>
             ) : (
-              <div className="table-container" style={{ maxHeight: '350px', overflowY: 'auto' }}>
+              <div className="table-container" style={{ maxHeight: '300px', overflowY: 'auto' }}>
                 <table className="data-table">
                   <thead>
                     <tr>
-                      <th>Time</th>
-                      <th>Movement Type</th>
-                      <th>Quantity Changed</th>
+                      <th>Time Logged</th>
+                      <th>Type</th>
+                      <th>Quantity</th>
                       <th>Reason</th>
-                      <th>Logged By</th>
+                      <th>User</th>
                     </tr>
                   </thead>
                   <tbody>
                     {selectedProduct.stockMovements.map((log) => (
                       <tr key={log.id}>
-                        <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                        <td style={{ fontSize: '0.75rem', color: 'var(--gray-500)' }}>
                           <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                             <Calendar size={12} /> {new Date(log.timestamp).toLocaleString('en-IN', {
                               day: 'numeric',
@@ -489,10 +768,10 @@ const Products: React.FC = () => {
                           )}
                         </td>
                         <td style={{ fontWeight: 600 }}>{log.quantityChanged} units</td>
-                        <td style={{ fontSize: '0.875rem' }}>{log.reason}</td>
+                        <td>{log.reason}</td>
                         <td>
-                          <span className="badge badge-info" style={{ textTransform: 'capitalize' }}>
-                            {log.createdBy.name} ({log.createdBy.role.toLowerCase()})
+                          <span className="badge badge-info">
+                            {log.createdBy.name}
                           </span>
                         </td>
                       </tr>
@@ -501,6 +780,59 @@ const Products: React.FC = () => {
                 </table>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Custom Dialog Alert/Confirm Modal Overlay */}
+      {dialog.isOpen && (
+        <div className="modal-overlay" style={{ zIndex: 1100 }}>
+          <div className="modal-content" style={{ maxWidth: '400px', textAlign: 'center', padding: '2rem' }}>
+            <h3 className="modal-title" style={{ justifyContent: 'center', fontSize: '1.15rem', marginBottom: '1rem', color: dialog.title.toLowerCase().includes('delete') || dialog.title.toLowerCase().includes('failed') || dialog.title.toLowerCase().includes('error') ? '#dc2626' : 'var(--color-primary)' }}>
+              {dialog.title}
+            </h3>
+            <p style={{ fontSize: '0.875rem', color: 'var(--gray-600)', marginBottom: '2rem', lineHeight: 1.5 }}>
+              {dialog.message}
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '0.75rem' }}>
+              {dialog.type === 'confirm' ? (
+                <>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    style={{ width: '100px' }}
+                    onClick={() => setDialog({ ...dialog, isOpen: false })}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="btn"
+                    style={{
+                      width: '100px',
+                      backgroundColor: dialog.title.toLowerCase().includes('delete') ? '#dc2626' : 'var(--color-primary)',
+                      color: 'white',
+                      borderColor: dialog.title.toLowerCase().includes('delete') ? '#dc2626' : 'var(--color-primary)',
+                    }}
+                    onClick={() => {
+                      setDialog({ ...dialog, isOpen: false });
+                      if (dialog.onConfirm) dialog.onConfirm();
+                    }}
+                  >
+                    Confirm
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  style={{ width: '100px' }}
+                  onClick={() => setDialog({ ...dialog, isOpen: false })}
+                >
+                  OK
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}

@@ -4,13 +4,14 @@ import Login from './pages/Login';
 import Customers from './pages/Customers';
 import Products from './pages/Products';
 import Challans from './pages/Challans';
-import { Users, Warehouse, FileText, LogOut, User } from 'lucide-react';
+import Logs from './pages/Logs';
+import { Users, Warehouse, FileText, LogOut, History } from 'lucide-react';
 
 const AppContent: React.FC = () => {
   const { user, loading, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<string>('customers');
 
-  // Set the default active tab based on user's role on login
+  // Set default tab based on role
   useEffect(() => {
     if (user) {
       if (user.role === 'WAREHOUSE') {
@@ -23,8 +24,8 @@ const AppContent: React.FC = () => {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', backgroundColor: 'var(--bg-app)' }}>
-        <p style={{ fontWeight: 500, color: 'var(--text-secondary)' }}>Loading Operations Portal...</p>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', backgroundColor: 'var(--gray-50)' }}>
+        <p style={{ fontWeight: 500, color: 'var(--gray-500)', fontSize: '0.875rem' }}>Loading Operations Portal...</p>
       </div>
     );
   }
@@ -33,24 +34,30 @@ const AppContent: React.FC = () => {
     return <Login />;
   }
 
-  // Define tab navigation based on role permissions
+  // Tabs configured with icons and roles
   const tabs = [
     {
       id: 'customers',
       name: 'CRM Customers',
-      icon: <Users size={18} />,
+      icon: <Users size={16} />,
       roles: ['ADMIN', 'SALES', 'ACCOUNTS'],
     },
     {
       id: 'products',
       name: 'Inventory Products',
-      icon: <Warehouse size={18} />,
+      icon: <Warehouse size={16} />,
       roles: ['ADMIN', 'SALES', 'WAREHOUSE', 'ACCOUNTS'],
     },
     {
       id: 'challans',
       name: 'Sales Challans',
-      icon: <FileText size={18} />,
+      icon: <FileText size={16} />,
+      roles: ['ADMIN', 'SALES', 'WAREHOUSE', 'ACCOUNTS'],
+    },
+    {
+      id: 'logs',
+      name: 'Inventory Logs',
+      icon: <History size={16} />,
       roles: ['ADMIN', 'SALES', 'WAREHOUSE', 'ACCOUNTS'],
     },
   ];
@@ -65,32 +72,63 @@ const AppContent: React.FC = () => {
         return <Products />;
       case 'challans':
         return <Challans />;
+      case 'logs':
+        return <Logs />;
       default:
         return <div className="card">Tab not found</div>;
     }
   };
 
-  const getPageTitle = () => {
+  const getPageTitleRoot = () => {
     switch (activeTab) {
       case 'customers':
-        return 'Customer Relationships';
+        return 'CRM';
       case 'products':
-        return 'Warehouse & Inventory';
+        return 'Inventory';
       case 'challans':
-        return 'Billing & Invoices';
+        return 'Invoices';
+      case 'logs':
+        return 'Inventory';
       default:
-        return 'Dashboard';
+        return 'Workspace';
+    }
+  };
+
+  const getPageTitleSub = () => {
+    switch (activeTab) {
+      case 'customers':
+        return 'Customers';
+      case 'products':
+        return 'Products';
+      case 'challans':
+        return 'Challans';
+      case 'logs':
+        return 'Logs';
+      default:
+        return 'Table';
     }
   };
 
   return (
     <div className="portal-container">
-      {/* Sidebar Navigation */}
+      {/* Sidebar Navigation (Screenshot style) */}
       <aside className="sidebar">
-        <div className="sidebar-brand">
-          <div className="brand-icon">F</div>
-          <span className="brand-name">FundsRoom ERP</span>
+        {/* User Profile Info Card instead of spaces-selector */}
+        <div className="sidebar-brand-wrapper">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', padding: '0.25rem 0.5rem' }}>
+            <div className="nav-profile-gradient" style={{ width: '32px', height: '32px', borderRadius: '50%', flexShrink: 0 }}></div>
+            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+              <span style={{ fontWeight: 600, fontSize: '0.825rem', color: 'var(--gray-900)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {user.name}
+              </span>
+              <span style={{ fontSize: '0.7rem', color: 'var(--gray-500)', fontWeight: 500, textTransform: 'capitalize' }}>
+                {user.role.toLowerCase()}
+              </span>
+            </div>
+          </div>
         </div>
+
+        <div className="workspace-section-header">Workspace</div>
 
         <nav style={{ flex: 1 }}>
           <ul className="sidebar-menu">
@@ -99,9 +137,8 @@ const AppContent: React.FC = () => {
                 <button
                   className={`menu-item ${activeTab === tab.id ? 'active' : ''}`}
                   onClick={() => setActiveTab(tab.id)}
-                  style={{ width: '100%', border: 'none', background: 'none', textAlign: 'left' }}
                 >
-                  {tab.icon}
+                  <span className="menu-icon">{tab.icon}</span>
                   {tab.name}
                 </button>
               </li>
@@ -109,38 +146,29 @@ const AppContent: React.FC = () => {
           </ul>
         </nav>
 
+        {/* Settings and Log out in Footer */}
         <div className="sidebar-footer">
           <button
             className="menu-item"
             onClick={logout}
-            style={{ width: '100%', border: 'none', background: 'none', textAlign: 'left', color: 'var(--color-danger-text)' }}
+            style={{ color: '#dc2626' }}
           >
-            <LogOut size={18} />
-            Logout Session
+            <span className="menu-icon"><LogOut size={16} style={{ color: '#dc2626' }} /></span>
+            Log out
           </button>
         </div>
       </aside>
 
-      {/* Main Content Layout */}
+      {/* Main Content Area */}
       <main className="main-wrapper">
         <header className="navbar">
-          <h1 className="navbar-title">{getPageTitle()}</h1>
-          
-          <div className="user-profile">
-            <div className="avatar">
-              <User size={18} />
-            </div>
-            <div className="user-info">
-              <span className="user-name">{user.name}</span>
-              <span className={`badge ${
-                user.role === 'ADMIN' ? 'badge-danger' :
-                user.role === 'SALES' ? 'badge-success' :
-                user.role === 'ACCOUNTS' ? 'badge-info' : 'badge-warning'
-              }`} style={{ alignSelf: 'flex-start', marginTop: '0.125rem' }}>
-                {user.role}
-              </span>
-            </div>
+          {/* Breadcrumbs style title */}
+          <div className="navbar-breadcrumbs">
+            <span className="breadcrumb-root">{getPageTitleRoot()}</span>
+            <span className="breadcrumb-separator">/</span>
+            <span className="breadcrumb-active">{getPageTitleSub()}</span>
           </div>
+          
         </header>
 
         <section className="content-container">

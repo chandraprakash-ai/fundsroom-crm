@@ -46,4 +46,7 @@ router.post('/', authenticateJWT, authorizeRoles(['ADMIN', 'SALES']), validateRe
 // Edit existing customer / Add follow-up notes
 router.put('/:id', authenticateJWT, authorizeRoles(['ADMIN', 'SALES']), validateRequest(updateCustomerSchema), customerController.updateCustomer);
 
+// Delete customer profile
+router.delete('/:id', authenticateJWT, authorizeRoles(['ADMIN', 'SALES']), customerController.deleteCustomer);
+
 export default router;

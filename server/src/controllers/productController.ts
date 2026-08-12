@@ -149,3 +149,45 @@ export const updateProduct = async (req: AuthenticatedRequest, res: Response, ne
     next(error);
   }
 };
+export const deleteProduct = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+  const { id } = req.params as { id: string };
+  try {
+    const product = await prisma.product.findUnique({ where: { id } });
+    if (!product) {
+      res.status(404).json({ status: 'fail', message: 'Product not found' });
+      return;
+    }
+
+    await prisma.product.delete({ where: { id } });
+    res.status(200).json({ status: 'success', message: 'Product deleted successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getAllStockLogs = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const logs = await prisma.stockMovementLog.findMany({
+      include: {
+        product: {
+          select: {
+            name: true,
+            sku: true,
+          },
+        },
+        createdBy: {
+          select: {
+            name: true,
+            role: true,
+          },
+        },
+      },
+      orderBy: {
+        timestamp: 'desc',
+      },
+    });
+    res.status(200).json(logs);
+  } catch (error) {
+    next(error);
+  }
+};

@@ -33,6 +33,9 @@ export const updateProductSchema = z.object({
 // Get all products (with search & low-stock filter)
 router.get('/', authenticateJWT, authorizeRoles(['ADMIN', 'SALES', 'WAREHOUSE', 'ACCOUNTS']), productController.getAllProducts);
 
+// Get all stock movement logs
+router.get('/logs', authenticateJWT, authorizeRoles(['ADMIN', 'SALES', 'WAREHOUSE', 'ACCOUNTS']), productController.getAllStockLogs);
+
 // Get single product & its movement history
 router.get('/:id', authenticateJWT, authorizeRoles(['ADMIN', 'SALES', 'WAREHOUSE', 'ACCOUNTS']), productController.getProductById);
 
@@ -41,5 +44,8 @@ router.post('/', authenticateJWT, authorizeRoles(['ADMIN', 'WAREHOUSE']), valida
 
 // Edit product details & stock
 router.put('/:id', authenticateJWT, authorizeRoles(['ADMIN', 'WAREHOUSE']), validateRequest(updateProductSchema), productController.updateProduct);
+
+// Delete product
+router.delete('/:id', authenticateJWT, authorizeRoles(['ADMIN', 'WAREHOUSE']), productController.deleteProduct);
 
 export default router;

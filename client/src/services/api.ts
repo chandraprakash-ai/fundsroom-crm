@@ -58,4 +58,12 @@ export const api = {
     });
     return handleResponse(response);
   },
+
+  delete: async (endpoint: string) => {
+    const response = await fetch(`${BASE_URL}${endpoint}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    return handleResponse(response);
+  },
 };
