@@ -105,7 +105,7 @@ export const createProduct = async (req: AuthenticatedRequest, res: Response, ne
 // D. Edit product details (Auto-logs manual stock changes)
 export const updateProduct = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
   const { id } = req.params as { id: string };
-  const updateData = req.body;
+  const { reason, ...dataToUpdate } = req.body;
   const userId = req.user!.id;
 
   try {
@@ -115,24 +115,24 @@ export const updateProduct = async (req: AuthenticatedRequest, res: Response, ne
       return;
     }
 
-    if (updateData.sku && updateData.sku !== product.sku) {
-      const skuConflict = await prisma.product.findUnique({ where: { sku: updateData.sku } });
+    if (dataToUpdate.sku && dataToUpdate.sku !== product.sku) {
+      const skuConflict = await prisma.product.findUnique({ where: { sku: dataToUpdate.sku } });
       if (skuConflict) {
-        res.status(400).json({ status: 'error', message: `SKU "${updateData.sku}" is already in use by another product` });
+        res.status(400).json({ status: 'error', message: `SKU "${dataToUpdate.sku}" is already in use by another product` });
         return;
       }
     }
 
     const updatedProduct = await prisma.$transaction(async (tx) => {
-      if (updateData.currentStock !== undefined && updateData.currentStock !== product.currentStock) {
-        const stockDiff = updateData.currentStock - product.currentStock;
+      if (dataToUpdate.currentStock !== undefined && dataToUpdate.currentStock !== product.currentStock) {
+        const stockDiff = dataToUpdate.currentStock - product.currentStock;
         
         await tx.stockMovementLog.create({
           data: {
             productId: id,
             quantityChanged: Math.abs(stockDiff),
             movementType: stockDiff > 0 ? MovementType.IN : MovementType.OUT,
-            reason: updateData.reason || 'Manual stock adjustment',
+            reason: reason || 'Manual stock adjustment',
             createdById: userId,
           }
         });
@@ -140,7 +140,7 @@ export const updateProduct = async (req: AuthenticatedRequest, res: Response, ne
 
       return await tx.product.update({
         where: { id },
-        data: updateData,
+        data: dataToUpdate,
       });
     });
 

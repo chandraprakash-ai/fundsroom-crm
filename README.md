@@ -4,6 +4,32 @@
 
 ---
 
+## ⚡ Quick Start: Local Setup
+
+1. **Backend Setup**:
+   ```bash
+   cd server && npm install
+   # Create server/.env and add:
+   # DATABASE_URL="postgresql://user:pass@host:5432/db"
+   # JWT_SECRET="your-jwt-secret-key"
+   npx prisma db push && npx prisma db seed
+   npm run dev
+   ```
+2. **Frontend Setup**:
+   ```bash
+   cd client && npm install
+   # Create client/.env and add:
+   # VITE_API_URL="http://localhost:5000/api"
+   npm run dev
+   ```
+3. **Demo Login Accounts**:
+   * **Admin:** `admin` / `password123`
+   * **Sales:** `sales` / `password123`
+   * **Warehouse:** `warehouse` / `password123`
+   * **Accounts:** `accounts` / `password123`
+
+---
+
 ## 📋 Table of Contents
 
 - [Overview](#overview)

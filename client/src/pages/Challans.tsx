@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { Plus, ShoppingBag, X, Search, Printer } from 'lucide-react';
+import { CustomSelect } from '../components/CustomSelect';
 
 interface ChallanItem {
   id: string;
@@ -476,7 +477,16 @@ const Challans: React.FC = () => {
   };
 
   const handleRemoveItemFromBuilder = (index: number) => {
-    setChallanItems(challanItems.filter((_, i) => i !== index));
+    const item = challanItems[index];
+    if (!item) return;
+
+    showCustomConfirm(
+      'Remove Item',
+      `Are you sure you want to remove ${item.name} from the invoice?`,
+      () => {
+        setChallanItems(prev => prev.filter((_, i) => i !== index));
+      }
+    );
   };
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
@@ -650,14 +660,14 @@ const Challans: React.FC = () => {
             {/* Status Option */}
             <div className="form-group" style={{ marginTop: '1.25rem' }}>
               <label className="form-label">Dispatch Execution Status</label>
-              <select
-                className="form-input"
+              <CustomSelect
                 value={formStatus}
-                onChange={(e) => setFormStatus(e.target.value as any)}
-              >
-                <option value="DRAFT">DRAFT (Creates Invoice, leaves inventory unchanged)</option>
-                <option value="CONFIRMED">CONFIRMED (Checks inventory and deducts stock)</option>
-              </select>
+                onChange={(val) => setFormStatus(val as any)}
+                options={[
+                  { value: 'DRAFT', label: 'DRAFT (Creates Invoice, leaves inventory unchanged)' },
+                  { value: 'CONFIRMED', label: 'CONFIRMED (Checks inventory and deducts stock)' },
+                ]}
+              />
             </div>
 
             {/* Items List Table */}
@@ -750,18 +760,15 @@ const Challans: React.FC = () => {
             {/* Product Selector with stock preview */}
             <div className="form-group">
               <label className="form-label">Product Selector</label>
-              <select
-                className="form-input"
+              <CustomSelect
                 value={builderProductId}
-                onChange={(e) => setBuilderProductId(e.target.value)}
-              >
-                <option value="">-- Select Product --</option>
-                {products.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} (SKU: {p.sku}) | Stock: {p.currentStock} | Price: ₹{p.unitPrice}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setBuilderProductId(val)}
+                placeholder="-- Select Product --"
+                options={products.map((p) => ({
+                  value: p.id,
+                  label: `${p.name} (SKU: ${p.sku}) | Stock: ${p.currentStock} | Price: ₹${p.unitPrice}`
+                }))}
+              />
             </div>
 
             <div className="form-group" style={{ marginTop: '1.25rem' }}>

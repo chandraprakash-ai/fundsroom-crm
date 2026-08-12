@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { Search, Plus, Calendar, Phone, Mail, Building, MapPin, NotepadText } from 'lucide-react';
+import { CustomSelect } from '../components/CustomSelect';
 
 interface Customer {
   id: string;
@@ -35,6 +36,7 @@ const Customers: React.FC = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Row selection state
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -127,7 +129,7 @@ const Customers: React.FC = () => {
   };
 
   const fetchCustomers = async () => {
-    setLoading(true);
+    if (customers.length === 0) setLoading(true);
     setError(null);
     try {
       let query = `?page=${page}&limit=8`;
@@ -189,6 +191,8 @@ const Customers: React.FC = () => {
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     setFormError(null);
 
     const payload = {
@@ -218,6 +222,8 @@ const Customers: React.FC = () => {
       } else {
         setFormError(err.message || 'An error occurred during save.');
       }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -331,27 +337,29 @@ const Customers: React.FC = () => {
             />
           </div>
           
-          <select
-            className="select-filter"
+          <CustomSelect
             value={statusFilter}
-            onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-          >
-            <option value="">All Statuses</option>
-            <option value="LEAD">Leads</option>
-            <option value="ACTIVE">Active</option>
-            <option value="INACTIVE">Inactive</option>
-          </select>
+            onChange={(val) => { setStatusFilter(val); setPage(1); }}
+            options={[
+              { value: '', label: 'All Statuses' },
+              { value: 'LEAD', label: 'Leads' },
+              { value: 'ACTIVE', label: 'Active' },
+              { value: 'INACTIVE', label: 'Inactive' },
+            ]}
+            style={{ width: '150px' }}
+          />
 
-          <select
-            className="select-filter"
+          <CustomSelect
             value={typeFilter}
-            onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }}
-          >
-            <option value="">All Types</option>
-            <option value="RETAIL">Retail</option>
-            <option value="WHOLESALE">Wholesale</option>
-            <option value="DISTRIBUTOR">Distributor</option>
-          </select>
+            onChange={(val) => { setTypeFilter(val); setPage(1); }}
+            options={[
+              { value: '', label: 'All Types' },
+              { value: 'RETAIL', label: 'Retail' },
+              { value: 'WHOLESALE', label: 'Wholesale' },
+              { value: 'DISTRIBUTOR', label: 'Distributor' },
+            ]}
+            style={{ width: '150px' }}
+          />
         </form>
 
         {canWrite && (
@@ -495,25 +503,24 @@ const Customers: React.FC = () => {
                           cust.status === 'ACTIVE' ? 'status-dot-active' : 
                           cust.status === 'LEAD' ? 'status-dot-idle' : 'status-dot-cancelled'
                         }`}></span>
-                        <select
+                        <CustomSelect
                           value={cust.status}
-                          onChange={(e) => handleStatusChange(cust.id, e.target.value as any)}
+                          onChange={(val) => handleStatusChange(cust.id, val as any)}
                           disabled={!canWrite}
+                          variant="minimal"
+                          options={[
+                            { value: 'ACTIVE', label: 'Active' },
+                            { value: 'LEAD', label: 'Lead' },
+                            { value: 'INACTIVE', label: 'Inactive' },
+                          ]}
                           style={{
-                            border: 'none',
-                            background: 'none',
                             fontWeight: 500,
                             fontSize: '0.825rem',
                             color: cust.status === 'ACTIVE' ? 'var(--status-active-text)' :
                                    cust.status === 'LEAD' ? 'var(--status-idle-text)' : 'var(--status-cancelled-text)',
-                            cursor: canWrite ? 'pointer' : 'default',
-                            paddingRight: '4px',
+                            width: '90px',
                           }}
-                        >
-                          <option value="ACTIVE" style={{ color: 'var(--status-active-text)' }}>Active</option>
-                          <option value="LEAD" style={{ color: 'var(--status-idle-text)' }}>Lead</option>
-                          <option value="INACTIVE" style={{ color: 'var(--status-cancelled-text)' }}>Inactive</option>
-                        </select>
+                        />
                       </div>
                     </td>
                     <td style={{ fontWeight: 500 }}>
@@ -665,27 +672,27 @@ const Customers: React.FC = () => {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div className="form-group">
                   <label className="form-label">Customer Type</label>
-                  <select
-                    className="form-input"
+                  <CustomSelect
                     value={formType}
-                    onChange={(e) => setFormType(e.target.value as any)}
-                  >
-                    <option value="RETAIL">Retail</option>
-                    <option value="WHOLESALE">Wholesale</option>
-                    <option value="DISTRIBUTOR">Distributor</option>
-                  </select>
+                    onChange={(val) => setFormType(val as any)}
+                    options={[
+                      { value: 'RETAIL', label: 'Retail' },
+                      { value: 'WHOLESALE', label: 'Wholesale' },
+                      { value: 'DISTRIBUTOR', label: 'Distributor' },
+                    ]}
+                  />
                 </div>
                 <div className="form-group">
                   <label className="form-label">CRM Status</label>
-                  <select
-                    className="form-input"
+                  <CustomSelect
                     value={formStatus}
-                    onChange={(e) => setFormStatus(e.target.value as any)}
-                  >
-                    <option value="LEAD">Lead</option>
-                    <option value="ACTIVE">Active</option>
-                    <option value="INACTIVE">Inactive</option>
-                  </select>
+                    onChange={(val) => setFormStatus(val as any)}
+                    options={[
+                      { value: 'LEAD', label: 'Lead' },
+                      { value: 'ACTIVE', label: 'Active' },
+                      { value: 'INACTIVE', label: 'Inactive' },
+                    ]}
+                  />
                 </div>
               </div>
 
@@ -728,11 +735,11 @@ const Customers: React.FC = () => {
                     Delete Customer
                   </button>
                 )}
-                <button type="button" className="btn btn-secondary" style={{ width: 'auto' }} onClick={() => setShowFormModal(false)}>
+                <button type="button" className="btn btn-secondary" style={{ width: 'auto' }} onClick={() => setShowFormModal(false)} disabled={isSubmitting}>
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-primary" style={{ width: 'auto' }}>
-                  {selectedCustomer ? 'Save Changes' : 'Create Customer'}
+                <button type="submit" className="btn btn-primary" style={{ width: 'auto' }} disabled={isSubmitting}>
+                  {isSubmitting ? 'Saving...' : (selectedCustomer ? 'Save Changes' : 'Create Customer')}
                 </button>
               </div>
             </form>

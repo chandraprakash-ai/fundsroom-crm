@@ -961,3 +961,7 @@ button, input, select, textarea {
   color: var(--gray-400);
   margin-bottom: 0.15rem;
 }
+
+.hover-bg-gray:hover {
+  background-color: var(--gray-50) !important;
+}

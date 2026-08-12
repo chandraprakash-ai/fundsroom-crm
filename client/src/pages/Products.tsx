@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { Search, Plus, AlertTriangle, ArrowUpRight, ArrowDownRight, Warehouse, Calendar, ClipboardList } from 'lucide-react';
+import { CustomSelect } from '../components/CustomSelect';
 
 interface StockMovement {
   id: string;
@@ -35,6 +36,7 @@ const Products: React.FC = () => {
   const [lowStockFilter, setLowStockFilter] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Search debouncing hook
   useEffect(() => {
@@ -164,7 +166,7 @@ const Products: React.FC = () => {
   }, [products, minPrice, maxPrice, categoryFilter, sortField, sortOrder]);
 
   const fetchProducts = async () => {
-    setLoading(true);
+    if (products.length === 0) setLoading(true);
     setError(null);
     try {
       let query = '';
@@ -270,6 +272,8 @@ const Products: React.FC = () => {
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     setFormError(null);
 
     const priceNum = Number(formPrice);
@@ -309,6 +313,8 @@ const Products: React.FC = () => {
       fetchProducts();
     } catch (err: any) {
       setFormError(err.message || 'Failed to save product information.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -339,16 +345,15 @@ const Products: React.FC = () => {
             />
           </div>
 
-          <select
-            className="select-filter"
+          <CustomSelect
             value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-          >
-            <option value="">All Categories</option>
-            {uniqueCategories.map((cat) => (
-              <option key={cat} value={cat}>{cat}</option>
-            ))}
-          </select>
+            onChange={(val) => setCategoryFilter(val)}
+            options={[
+              { value: '', label: 'All Categories' },
+              ...uniqueCategories.map((cat) => ({ value: cat, label: cat }))
+            ]}
+            style={{ width: '160px' }}
+          />
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
             <input
@@ -682,11 +687,11 @@ const Products: React.FC = () => {
                     Delete Product
                   </button>
                 )}
-                <button type="button" className="btn btn-secondary" style={{ width: 'auto' }} onClick={() => setShowFormModal(false)}>
+                <button type="button" className="btn btn-secondary" style={{ width: 'auto' }} onClick={() => setShowFormModal(false)} disabled={isSubmitting}>
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-primary" style={{ width: 'auto' }}>
-                  {selectedProduct ? 'Adjust Stock' : 'Create Product'}
+                <button type="submit" className="btn btn-primary" style={{ width: 'auto' }} disabled={isSubmitting}>
+                  {isSubmitting ? 'Saving...' : (selectedProduct ? 'Adjust Stock' : 'Create Product')}
                 </button>
               </div>
             </form>
