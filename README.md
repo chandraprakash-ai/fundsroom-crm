@@ -1,4 +1,4 @@
-**Demo Login Accounts (Use on [fundsroom-crm.vercel.app](fundsroom-crm.vercel.app))**:
+**Demo Login Accounts (Use on fundsroom-crm.vercel.app)**:
    * **Admin:** `admin` / `password123`
    * **Sales:** `sales` / `password123`
    * **Warehouse:** `warehouse` / `password123`
