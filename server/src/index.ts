@@ -1,6 +1,10 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import authRoutes from './routes/auth';
+import customerRoutes from './routes/customers';
+import productRoutes from './routes/products';
+import challanRoutes from './routes/challans';
 
 // Load environment variables
 dotenv.config();
@@ -12,6 +16,12 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Mount Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/customers', customerRoutes);
+app.use('/api/products', productRoutes);
+app.use('/api/challans', challanRoutes);
 
 // Base API Health Route
 app.get('/api/health', (req: Request, res: Response) => {
