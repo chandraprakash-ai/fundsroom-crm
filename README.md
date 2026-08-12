@@ -1,3 +1,9 @@
+**Demo Login Accounts (Use on [fundsroom-crm.vercel.app](fundsroom-crm.vercel.app))**:
+   * **Admin:** `admin` / `password123`
+   * **Sales:** `sales` / `password123`
+   * **Warehouse:** `warehouse` / `password123`
+   * **Accounts:** `accounts` / `password123`
+
 # 🏢 FundsRoom CRM
 
 > A full-stack, role-based CRM system for managing customers, inventory, and sales challans — built with **React + Vite** on the frontend and **Express.js + Prisma + PostgreSQL** on the backend.
@@ -22,11 +28,6 @@
    # VITE_API_URL="http://localhost:5000/api"
    npm run dev
    ```
-3. **Demo Login Accounts**:
-   * **Admin:** `admin` / `password123`
-   * **Sales:** `sales` / `password123`
-   * **Warehouse:** `warehouse` / `password123`
-   * **Accounts:** `accounts` / `password123`
 
 ---
 
