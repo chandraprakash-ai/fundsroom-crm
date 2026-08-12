@@ -85,6 +85,10 @@ const Challans: React.FC = () => {
     setDialog({ isOpen: true, type: 'alert', title, message });
   };
 
+  const showCustomConfirm = (title: string, message: string, onConfirm: () => void) => {
+    setDialog({ isOpen: true, type: 'confirm', title, message, onConfirm });
+  };
+
   // Modals state
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
