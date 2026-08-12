@@ -24,10 +24,10 @@ app.use('/api/products', productRoutes);
 app.use('/api/challans', challanRoutes);
 
 // Base API Health Route
-app.get('/api/health', (req: Request, res: Response) => {
+app.get(['/', '/api', '/api/health'], (req: Request, res: Response) => {
   res.status(200).json({
     status: 'success',
-    message: 'Server is running smoothly',
+    message: 'Welcome to FundsRoom CRM API. The server is running smoothly.',
     timestamp: new Date().toISOString(),
     uptime: process.uptime()
   });
